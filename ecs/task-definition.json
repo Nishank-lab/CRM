@@ -1,0 +1,67 @@
+{
+  "family": "crm-db-check-comp-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::{{ACCOUNT_ID}}:role/ecsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "crm-db-check-comp",
+      "image": "{{IMAGE_URI}}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8080,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "SPRING_PROFILES_ACTIVE",
+          "value": "docker"
+        },
+        {
+          "name": "JAVA_OPTS",
+          "value": "-Xmx768m -Xms384m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+        },
+        {
+          "name": "DDL_AUTO",
+          "value": "validate"
+        },
+        {
+          "name": "DB_URL",
+          "value": "jdbc:mysql://mysql-host:3306/crm?useSSL=false"
+        },
+        {
+          "name": "DB_USERNAME",
+          "value": "root"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "value": "password"
+        },
+        {
+          "name": "MANAGEMENT_SECURITY_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "TZ",
+          "value": "UTC"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/crm-db-check-comp",
+          "awslogs-region": "{{AWS_REGION}}",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

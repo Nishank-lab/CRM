@@ -1,0 +1,44 @@
+# Build output
+target/
+
+# Maven wrapper (use system Maven in Docker)
+mvnw
+mvnw.cmd
+.mvn/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+LICENSE*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test files
+src/test/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*~
