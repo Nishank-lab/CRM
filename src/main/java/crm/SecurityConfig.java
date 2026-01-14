@@ -1,20 +1,32 @@
 package crm;
 
 import crm.service.SpringDataUserDetailsService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Cloud-native Spring Security Configuration
+ * Updated to use SecurityFilterChain pattern (Spring Security 5.7+)
+ * Replaced deprecated WebSecurityConfigurerAdapter
+ */
 @Configuration
 @EnableWebSecurity
-@EnableGlobalMethodSecurity(securedEnabled = true)
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
+@EnableGlobalMethodSecurity(securedEnabled = true, prePostEnabled = true)
+public class SecurityConfig {
+
+    private final SpringDataUserDetailsService userDetailsService;
+
+    public SecurityConfig(SpringDataUserDetailsService userDetailsService) {
+        this.userDetailsService = userDetailsService;
+    }
 
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
@@ -26,23 +38,41 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
         return new SpringDataUserDetailsService();
     }
 
-    @Autowired
-    public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
-        auth.userDetailsService(customUserDetailsService()).passwordEncoder(passwordEncoder());
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
     }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.authorizeRequests()
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests(authorize -> authorize
+                .antMatchers("/actuator/health", "/actuator/info").permitAll()
                 .antMatchers("/admin/**", "/user/delete/**").hasRole("ADMIN")
-                .antMatchers("/pdf-generator", "/search/**", "/customer/**", "/user/edit/**", "/user/list", "/contract/**").hasAnyRole( "ADMIN", "USER", "MANAGER", "OWNER")
+                .antMatchers("/pdf-generator", "/search/**", "/customer/**", "/user/edit/**", "/user/list", "/contract/**")
+                    .hasAnyRole("ADMIN", "USER", "MANAGER", "OWNER")
                 .anyRequest().permitAll()
-                .and()
-                .formLogin().loginPage("/login").permitAll()
-                .and()
-                .logout().logoutSuccessUrl("/").permitAll()
-                .and()
-                .exceptionHandling().accessDeniedPage("/403");
+            )
+            .formLogin(form -> form
+                .loginPage("/login")
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("/")
+                .permitAll()
+            )
+            .exceptionHandling(exception -> exception
+                .accessDeniedPage("/403")
+            )
+            // Cloud-native: Enable CSRF protection
+            .csrf(csrf -> csrf.ignoringAntMatchers("/actuator/**"));
+
+        return http.build();
+    }
+
+    @Bean
+    public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
+        auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
     }
 
 }

@@ -74,11 +74,27 @@ public class UserServiceImpl implements UserService {
             user.setRole(userRole);
             userRepository.save(user);
         }
-        UserDetails userDetails = springDataUserDetailsService.loadUserByUsername(user.getUsername());
-        UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                new UsernamePasswordAuthenticationToken(userDetails, password, userDetails.getAuthorities());
-        authenticationManager.authenticate(usernamePasswordAuthenticationToken);
-        SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
+
+        // Cloud-native: Auto-login after registration
+        // Note: In cloud environments with external session stores (Redis),
+        // the SecurityContext is automatically synchronized across instances
+        try {
+            UserDetails userDetails = springDataUserDetailsService.loadUserByUsername(user.getUsername());
+            UsernamePasswordAuthenticationToken authToken =
+                    new UsernamePasswordAuthenticationToken(userDetails, password, userDetails.getAuthorities());
+
+            // Authenticate the user
+            authenticationManager.authenticate(authToken);
+
+            // Set authentication in SecurityContext
+            // This will be stored in Redis if spring.session.store-type=redis
+            SecurityContextHolder.getContext().setAuthentication(authToken);
+        } catch (Exception e) {
+            // Log but don't fail user creation if auto-login fails
+            // User can still login manually
+            org.slf4j.LoggerFactory.getLogger(UserServiceImpl.class)
+                .warn("Auto-login after user registration failed for user: {}", user.getUsername(), e);
+        }
     }
 
     @Override

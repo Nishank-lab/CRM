@@ -1,0 +1,141 @@
+# AWS ECS Task Definition for CRM Application
+# Deploy to AWS Fargate for serverless container orchestration
+
+apiVersion: v1
+kind: TaskDefinition
+metadata:
+  name: crm-application
+
+spec:
+  family: crm-app
+  networkMode: awsvpc
+  requiresCompatibilities:
+    - FARGATE
+  cpu: '512'
+  memory: '1024'
+
+  executionRoleArn: arn:aws:iam::ACCOUNT_ID:role/ecsTaskExecutionRole
+  taskRoleArn: arn:aws:iam::ACCOUNT_ID:role/crmAppTaskRole
+
+  containerDefinitions:
+    - name: crm-app
+      image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/crm-app:latest
+      essential: true
+
+      portMappings:
+        - containerPort: 8080
+          protocol: tcp
+
+      environment:
+        - name: SPRING_PROFILES_ACTIVE
+          value: cloud
+        - name: ENVIRONMENT
+          value: production
+        - name: AWS_REGION
+          value: us-east-1
+        - name: THYMELEAF_CACHE
+          value: "true"
+        - name: PDF_STORAGE_ENABLED
+          value: "true"
+        - name: SESSION_STORE_TYPE
+          value: redis
+        - name: ACTUATOR_SECURITY_ENABLED
+          value: "true"
+        - name: DDL_AUTO
+          value: validate
+
+      secrets:
+        - name: DB_URL
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/db/url
+        - name: DB_USERNAME
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/db/username
+        - name: DB_PASSWORD
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/db/password
+        - name: AWS_S3_BUCKET
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/s3/bucket
+        - name: REDIS_HOST
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/redis/host
+        - name: REDIS_PASSWORD
+          valueFrom: arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:crm/redis/password
+
+      logConfiguration:
+        logDriver: awslogs
+        options:
+          awslogs-group: /ecs/crm-app
+          awslogs-region: us-east-1
+          awslogs-stream-prefix: ecs
+
+      healthCheck:
+        command:
+          - CMD-SHELL
+          - wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+        interval: 30
+        timeout: 5
+        retries: 3
+        startPeriod: 60
+
+---
+# Service Definition
+apiVersion: v1
+kind: Service
+metadata:
+  name: crm-service
+
+spec:
+  cluster: crm-cluster
+  serviceName: crm-service
+  taskDefinition: crm-app
+  desiredCount: 2
+
+  launchType: FARGATE
+
+  networkConfiguration:
+    awsvpcConfiguration:
+      subnets:
+        - subnet-XXXXX
+        - subnet-YYYYY
+      securityGroups:
+        - sg-XXXXX
+      assignPublicIp: ENABLED
+
+  loadBalancers:
+    - targetGroupArn: arn:aws:elasticloadbalancing:REGION:ACCOUNT_ID:targetgroup/crm-tg/XXXXX
+      containerName: crm-app
+      containerPort: 8080
+
+  deploymentConfiguration:
+    maximumPercent: 200
+    minimumHealthyPercent: 100
+    deploymentCircuitBreaker:
+      enable: true
+      rollback: true
+
+  serviceRegistries:
+    - registryArn: arn:aws:servicediscovery:REGION:ACCOUNT_ID:service/srv-XXXXX
+
+---
+# Auto Scaling Configuration
+apiVersion: v1
+kind: AutoScaling
+metadata:
+  name: crm-autoscaling
+
+spec:
+  serviceNamespace: ecs
+  resourceId: service/crm-cluster/crm-service
+  scalableDimension: ecs:service:DesiredCount
+  minCapacity: 2
+  maxCapacity: 10
+
+  targetTrackingScalingPolicies:
+    - policyName: cpu-scaling
+      targetValue: 70
+      scaleInCooldown: 300
+      scaleOutCooldown: 60
+      predefinedMetricType: ECSServiceAverageCPUUtilization
+
+    - policyName: memory-scaling
+      targetValue: 80
+      scaleInCooldown: 300
+      scaleOutCooldown: 60
+      predefinedMetricType: ECSServiceAverageMemoryUtilization

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProfile name="default,local">
+        <!-- Console appender for local development -->
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="cloud,aws,production">
+        <!-- JSON structured logging for cloud environments -->
+        <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <includeCallerData>false</includeCallerData>
+                <customFields>{"application":"crm","environment":"${ENVIRONMENT:production}"}</customFields>
+                <fieldNames>
+                    <timestamp>timestamp</timestamp>
+                    <version>version</version>
+                    <message>message</message>
+                    <logger>logger</logger>
+                    <thread>thread</thread>
+                    <level>level</level>
+                    <levelValue>levelValue</levelValue>
+                </fieldNames>
+            </encoder>
+        </appender>
+
+        <root level="${LOG_LEVEL_ROOT:INFO}">
+            <appender-ref ref="JSON_CONSOLE"/>
+        </root>
+
+        <logger name="crm" level="${LOG_LEVEL_APP:INFO}"/>
+        <logger name="org.springframework.web" level="${LOG_LEVEL_SPRING:WARN}"/>
+        <logger name="org.hibernate" level="${LOG_LEVEL_HIBERNATE:WARN}"/>
+    </springProfile>
+
+    <!-- AWS X-Ray correlation -->
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <appender-ref ref="JSON_CONSOLE"/>
+    </appender>
+
+</configuration>
