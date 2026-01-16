@@ -1,0 +1,54 @@
+# Maven wrapper files (use system Maven instead)
+mvnw
+mvnw.cmd
+.mvn/
+
+# Build output
+target/
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+README*
+LICENSE*
+docs/
+
+# Test files
+*.log
+*.tmp
+
+# Application logs
+logs/
+*.log
+
+# Configuration (should be mounted or injected)
+config/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+Jenkinsfile
+
+# Docker files
+docker-compose*.yml
+Dockerfile*
+.dockerignore
